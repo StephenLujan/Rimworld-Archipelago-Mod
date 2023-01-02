@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<Defs>
+	<!-- Just some references here -->
+	<!-- 
+  <ThingDef Name="BuildingBase" Abstract="True">
+    <category>Building</category>
+    <thingClass>Building</thingClass>
+    <soundImpactDefault>BulletImpact_Metal</soundImpactDefault>
+    <selectable>true</selectable>
+    <drawerType>MapMeshOnly</drawerType>
+    <terrainAffordanceNeeded>Light</terrainAffordanceNeeded>
+    <repairEffect>Repair</repairEffect>
+    <leaveResourcesWhenKilled>true</leaveResourcesWhenKilled>
+    <filthLeaving>Filth_RubbleBuilding</filthLeaving>
+    <statBases>
+      <SellPriceFactor>0.70</SellPriceFactor>
+    </statBases>
+  </ThingDef>
+  
+
+  <ThingDef Name="BenchBase" ParentName="BuildingBase" Abstract="True">
+    <canOverlapZones>false</canOverlapZones>
+    <minifiedDef>MinifiedThing</minifiedDef>
+    <terrainAffordanceNeeded>Medium</terrainAffordanceNeeded>
+    <thingCategories>
+      <li>BuildingsProduction</li>
+    </thingCategories>
+    <statBases>
+      <Mass>20</Mass>
+    </statBases>
+    <interactionCellIcon>DiningChair</interactionCellIcon>
+    <comps>
+      <li>
+        <compClass>CompReportWorkSpeed</compClass>
+      </li>
+    </comps>
+    <placeWorkers>
+      <li>PlaceWorker_ReportWorkSpeedPenalties</li>
+    </placeWorkers>
+    <building>
+      <buildingTags>
+        <li>Production</li>
+      </buildingTags>
+    </building>
+  </ThingDef>
+   -->
+  <!-- ========================= Work tables ==========================-->
+
+  <ThingDef ParentName="BenchBase">
+    <defName>ArchipelagoBench</defName>
+    <label>Archipelago Bench</label>
+    <description>A workstation for archipelago.</description>
+	<thingClass>Building_WorkTable</thingClass>
+
+    <graphicData>
+      <texPath>Building/archipelago_bench</texPath>
+	  <graphicClass>Graphic_Single</graphicClass>
+      <drawSize>(1,1)</drawSize>
+      <damageData>
+		<rect>(0, 0, 1, 1)</rect>
+	  </damageData>
+    </graphicData>
+	<!-- <altitudeLayer>FloorEmplacement</altitudeLayer> -->
+	<constructEffect>ConstructMetal</constructEffect>
+	<castEdgeShadows>true</castEdgeShadows>
+    <staticSunShadowHeight>0.10</staticSunShadowHeight>
+	<altitudeLayer>Building</altitudeLayer>
+    <fillPercent>0.8</fillPercent>
+	
+    <costList>
+      <Steel>50</Steel>
+      <ComponentIndustrial>1</ComponentIndustrial>
+    </costList>
+
+    <useHitPoints>True</useHitPoints>
+    <statBases>
+		<MaxHitPoints>150</MaxHitPoints>
+		<WorkToBuild>500</WorkToBuild>
+		<Flammability>1.0</Flammability>
+		<Cleanliness>-2</Cleanliness>
+    </statBases>
+    <size>(1,1)</size>
+    <designationCategory>Production</designationCategory>
+    <passability>PassThroughOnly</passability>
+    <pathCost>50</pathCost>
+    <hasInteractionCell>True</hasInteractionCell>
+    <interactionCellOffset>(0,0,-1)</interactionCellOffset>
+    <surfaceType>Item</surfaceType>
+    <recipes>
+      <li>Make_Kibble</li> <!--just a test-->
+    </recipes>
+    <inspectorTabs>
+      <li>ITab_Bills</li>
+    </inspectorTabs>
+    <building>
+	  <paintable>false</paintable>
+      <spawnedConceptLearnOpportunity>BillsTab</spawnedConceptLearnOpportunity>
+	  <forceShowRoomStats>true</forceShowRoomStats>
+    </building>
+	<!-- TODO comps -->
+	<comps>
+      <li Class="CompProperties_AffectedByFacilities">
+        <linkableFacilities>
+          <li>ToolCabinet</li>
+        </linkableFacilities>
+      </li>
+    </comps>
+    <placeWorkers>
+      <li>PlaceWorker_ShowFacilitiesConnections</li>
+      <li>PlaceWorker_PreventInteractionSpotOverlap</li>
+    </placeWorkers>
+  </ThingDef>
+</Defs>

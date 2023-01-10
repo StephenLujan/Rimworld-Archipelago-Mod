@@ -1,5 +1,6 @@
 ﻿using Archipelago.MultiClient.Net.Helpers;
 using Newtonsoft.Json;
+using RimWorld;
 using RimworldArchipelago.Client;
 using System;
 using System.Collections.Concurrent;
@@ -40,20 +41,28 @@ namespace RimworldArchipelago
             try
             {
                 Debug.Assert(RimworldArchipelagoMod.Session != null);
-                var sess = RimworldArchipelagoMod.Session;
-                Players = sess.Players.AllPlayers.ToDictionary(x => x.Slot);
-                var allLocations = sess.Locations.AllLocations.ToArray();
-                var items = (await sess.Locations.ScoutLocationsAsync(false, allLocations)).Locations;
-                //Log.Message("allLocations: "+JsonConvert.SerializeObject(allLocations));
-                //Log.Message("items: " + JsonConvert.SerializeObject(items));
+                await LoadLocationDictionary();
+                LoadResearchDefs();
+            }
+            catch (Exception ex) { Log.Error(ex.Message + "\n" + ex.StackTrace); }
+        }
 
-                Parallel.ForEach(
-                    items,
-                    new ParallelOptions
-                    {
-                        MaxDegreeOfParallelism = Convert.ToInt32(Math.Ceiling((Environment.ProcessorCount * 0.75) * 2.0))
-                    },
-                    item =>
+        public async Task LoadLocationDictionary()
+        {
+            var sess = RimworldArchipelagoMod.Session;
+            Players = sess.Players.AllPlayers.ToDictionary(x => x.Slot);
+            var allLocations = sess.Locations.AllLocations.ToArray();
+            var items = (await sess.Locations.ScoutLocationsAsync(false, allLocations)).Locations;
+            //Log.Message("allLocations: "+JsonConvert.SerializeObject(allLocations));
+            //Log.Message("items: " + JsonConvert.SerializeObject(items));
+
+            Parallel.ForEach(
+                items,
+                new ParallelOptions
+                {
+                    MaxDegreeOfParallelism = Convert.ToInt32(Math.Ceiling((Environment.ProcessorCount * 0.75) * 2.0))
+                },
+                item =>
                 {
                     try
                     {
@@ -88,11 +97,45 @@ namespace RimworldArchipelago
                     catch (Exception ex) { Log.Error(ex.Message + "\n" + ex.StackTrace); }
                 });
 
-                Log.Message("Researches: " + JsonConvert.SerializeObject(Researches));
-                Log.Message("Crafts: " + JsonConvert.SerializeObject(Crafts));
-                Log.Message("Purchases: " + JsonConvert.SerializeObject(Purchases));
-            }
-            catch (Exception ex) { Log.Error(ex.Message + "\n" + ex.StackTrace); }
+            Log.Message(" Researches: " + JsonConvert.SerializeObject(Researches));
+            Log.Message(" Crafts: " + JsonConvert.SerializeObject(Crafts));
+            Log.Message(" Purchases: " + JsonConvert.SerializeObject(Purchases));
+        }
+        public void LoadResearchDefs()
+        {
+            JsonSerializerSettings sets = new JsonSerializerSettings
+            {
+                PreserveReferencesHandling = PreserveReferencesHandling.Objects
+            };
+            var tab = DefDatabase<ResearchTabDef>.GetNamed("AD_Archipelago");
+            //Log.Message($"research tab: {JsonConvert.SerializeObject(tab, sets)}");
+            //using rdb = DefDatabase<ResearchProjectDef>;
+            Log.Message($"research tab.generated: {JsonConvert.SerializeObject(tab.generated)}");
+            var researchesBefore = DefDatabase<ResearchProjectDef>.DefCount;
+            Log.Message($"number of researches before: {researchesBefore}");
+            //Log.Message($"{ JsonConvert.SerializeObject(DefDatabase<ResearchProjectDef>.AllDefsListForReading, sets)}");
+            int iter = -1;
+            int rows = 5;
+            var newResearches = Researches.Select(kvp =>
+            {
+                iter++;
+                return new ResearchProjectDef()
+                {
+                    baseCost = 10,
+                    defName = $"AP_{kvp.Key}",
+                    description = kvp.Value.ExtendedItemName + $" (AP_{kvp.Key})",
+                    label = kvp.Value.ExtendedItemName,
+                    tab = tab,
+                    researchViewX = iter / rows,
+                    researchViewY = iter % rows,
+                };
+            });
+            DefDatabase<ResearchProjectDef>.Add(newResearches);
+            var researchesAfter = DefDatabase<ResearchProjectDef>.DefCount;
+            Log.Message($"number of researches after: {researchesAfter}");
+            ResearchProjectDef.GenerateNonOverlappingCoordinates();
+
+            //Log.Message($"{ JsonConvert.SerializeObject(DefDatabase<ResearchProjectDef>.AllDefsListForReading, sets)}");
         }
     }
 }

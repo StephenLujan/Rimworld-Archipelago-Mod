@@ -3,8 +3,10 @@ using Archipelago.MultiClient.Net.Enums;
 using HarmonyLib;
 using Newtonsoft.Json;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net.Mail;
 using System.Text;
 using System.Threading.Tasks;
 using UnityEngine.PlayerLoop;
@@ -12,7 +14,7 @@ using Verse;
 
 namespace RimworldArchipelago.Client
 {
-    public class RimworldArchipelagoMod : Mod
+    public class RimWorldArchipelagoMod : Mod
     {
 
         public static Harmony Harmony;
@@ -21,9 +23,9 @@ namespace RimworldArchipelago.Client
         public static string Address { get; private set; } = "127.0.0.1:38281";
         public static string PlayerSlot { get; private set; } = "";
 
-        public static ArchipelagoLoader ArchipelagoLoader{ get; private set; }
+        public static ArchipelagoLoader ArchipelagoLoader { get; private set; }
 
-        public RimworldArchipelagoMod(ModContentPack content) : base(content)
+        public RimWorldArchipelagoMod(ModContentPack content) : base(content)
         {
 
         }
@@ -87,6 +89,16 @@ namespace RimworldArchipelago.Client
             _ = ArchipelagoLoader.Load();
 
             return true;
+        }
+
+        public static readonly IDictionary<string, long> DefNameToArchipelagoId = new ConcurrentDictionary<string, long>();
+
+        public static readonly IDictionary<long, Tuple<string, string>> ArchipeligoIdToDef = new ConcurrentDictionary<long, Tuple<string, string>>();
+
+        public static void SendLocationCheck(string defName)
+        {
+            Log.Message($"Sending completed location {defName} to Archipelago");
+            Session.Locations.CompleteLocationChecks(DefNameToArchipelagoId[defName]);
         }
     }
 }

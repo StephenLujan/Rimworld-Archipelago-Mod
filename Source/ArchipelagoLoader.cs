@@ -1,12 +1,15 @@
-﻿using Archipelago.MultiClient.Net.Helpers;
+﻿using Archipelago.MultiClient.Net;
+using Archipelago.MultiClient.Net.Helpers;
 using Newtonsoft.Json;
 using RimWorld;
 using RimworldArchipelago.Client;
+using Steamworks;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading.Tasks;
 using Verse;
@@ -24,37 +27,64 @@ namespace RimworldArchipelago
             public int Player;
             public string ExtendedItemName;
         }
+
+        public class LocationResearchMetaData
+        {
+            public float x;
+            public float y;
+            public float cost;
+            public long[] prerequisites;
+        }
+
         public IDictionary<int, PlayerInfo> Players { get; private set; }
 
         public readonly IDictionary<long, Location> Researches = new ConcurrentDictionary<long, Location>();
         public readonly IDictionary<long, Location> Crafts = new ConcurrentDictionary<long, Location>();
         public readonly IDictionary<long, Location> Purchases = new ConcurrentDictionary<long, Location>();
+        public IDictionary<string, object> SlotData { get; private set; }
+        public int CurrentPlayerId;
+
+        public ArchipelagoSession Session => RimWorldArchipelagoMod.Session;
 
         public ArchipelagoLoader()
         {
 
         }
 
+
         public async Task Load()
         {
             Log.Message("ArchipelagoLoader started...");
             try
             {
-                Debug.Assert(RimworldArchipelagoMod.Session != null);
+                Debug.Assert(Session != null);
+                Players = Session.Players.AllPlayers.ToDictionary(x => x.Slot);
+                CurrentPlayerId = Players.First(kvp => kvp.Value.Name == RimWorldArchipelagoMod.PlayerSlot).Key;
+                SlotData = await Session.DataStorage.GetSlotDataAsync(CurrentPlayerId);
+
+
+                LoadRimworldDefMaps();
                 await LoadLocationDictionary();
                 LoadResearchDefs();
+                AddSessionHooks();
             }
             catch (Exception ex) { Log.Error(ex.Message + "\n" + ex.StackTrace); }
         }
-
-        public async Task LoadLocationDictionary()
+        private void LoadRimworldDefMaps()
         {
-            var sess = RimworldArchipelagoMod.Session;
-            Players = sess.Players.AllPlayers.ToDictionary(x => x.Slot);
-            var allLocations = sess.Locations.AllLocations.ToArray();
-            var items = (await sess.Locations.ScoutLocationsAsync(false, allLocations)).Locations;
-            //Log.Message("allLocations: "+JsonConvert.SerializeObject(allLocations));
-            //Log.Message("items: " + JsonConvert.SerializeObject(items));
+            var defNameMap = JsonConvert.DeserializeObject<Dictionary<long, string[]>>(SlotData["defNameMap"].ToString());
+            foreach (var kvp in defNameMap)
+            {
+                RimWorldArchipelagoMod.ArchipeligoIdToDef[kvp.Key] = Tuple.Create(kvp.Value[0], kvp.Value[1]);
+            }
+        }
+        private async Task LoadLocationDictionary()
+        {
+            var hints = await Session.DataStorage.GetHintsAsync();
+
+            var allLocations = Session.Locations.AllLocations.ToArray();
+            var items = (await Session.Locations.ScoutLocationsAsync(false, allLocations)).Locations;
+
 
             Parallel.ForEach(
                 items,
@@ -67,8 +97,8 @@ namespace RimworldArchipelago
                     try
                     {
                         var locationId = item.Location;
-                        var itemName = sess.Items.GetItemName(item.Item);
-                        var locationName = sess.Locations.GetLocationNameFromId(locationId);
+                        var itemName = Session.Items.GetItemName(item.Item);
+                        var locationName = Session.Locations.GetLocationNameFromId(locationId);
                         var location = new Location()
                         {
                             ItemId = item.Item,
@@ -101,41 +131,79 @@ namespace RimworldArchipelago
             Log.Message(" Crafts: " + JsonConvert.SerializeObject(Crafts));
             Log.Message(" Purchases: " + JsonConvert.SerializeObject(Purchases));
         }
-        public void LoadResearchDefs()
+
+        /// <summary>
+        /// seems clunky, but here we combine the research segment of Locations with the research-only metadata,
+        /// output them as RimWorld ResearchProjectDefs, and add them to the Archipelago research tab
+        /// </summary>
+        private void LoadResearchDefs()
         {
             JsonSerializerSettings sets = new JsonSerializerSettings
             {
                 PreserveReferencesHandling = PreserveReferencesHandling.Objects
             };
             var tab = DefDatabase<ResearchTabDef>.GetNamed("AD_Archipelago");
-            //Log.Message($"research tab: {JsonConvert.SerializeObject(tab, sets)}");
-            //using rdb = DefDatabase<ResearchProjectDef>;
-            Log.Message($"research tab.generated: {JsonConvert.SerializeObject(tab.generated)}");
             var researchesBefore = DefDatabase<ResearchProjectDef>.DefCount;
             Log.Message($"number of researches before: {researchesBefore}");
-            //Log.Message($"{ JsonConvert.SerializeObject(DefDatabase<ResearchProjectDef>.AllDefsListForReading, sets)}");
-            int iter = -1;
-            int rows = 5;
-            var newResearches = Researches.Select(kvp =>
+
+
+            var techTree = JsonConvert.DeserializeObject<Dictionary<long, LocationResearchMetaData>>(SlotData["techTree"].ToString());
+            var newResearchDefs = new Dictionary<long, ResearchProjectDef>();
+            foreach (var kvp in techTree)
             {
-                iter++;
-                return new ResearchProjectDef()
+                var locationData = Researches[kvp.Key];
+                var def = new ResearchProjectDef()
                 {
-                    baseCost = 10,
+                    baseCost = kvp.Value.cost,
                     defName = $"AP_{kvp.Key}",
-                    description = kvp.Value.ExtendedItemName + $" (AP_{kvp.Key})",
-                    label = kvp.Value.ExtendedItemName,
+                    description = locationData.ExtendedItemName + $" (AP_{kvp.Key})",
+                    label = locationData.ExtendedItemName,
                     tab = tab,
-                    researchViewX = iter / rows,
-                    researchViewY = iter % rows,
+                    researchViewX = kvp.Value.x,
+                    researchViewY = kvp.Value.y,
+
                 };
-            });
-            DefDatabase<ResearchProjectDef>.Add(newResearches);
+                newResearchDefs.Add(kvp.Key, def);
+                RimWorldArchipelagoMod.DefNameToArchipelagoId[def.defName] = kvp.Key;
+            }
+            foreach (var kvp in newResearchDefs)
+            {
+                kvp.Value.prerequisites = techTree[kvp.Key].prerequisites.Select(x => newResearchDefs[x]).ToList();
+            }
+
+            DefDatabase<ResearchProjectDef>.Add(newResearchDefs.Values);
             var researchesAfter = DefDatabase<ResearchProjectDef>.DefCount;
             Log.Message($"number of researches after: {researchesAfter}");
             ResearchProjectDef.GenerateNonOverlappingCoordinates();
-
-            //Log.Message($"{ JsonConvert.SerializeObject(DefDatabase<ResearchProjectDef>.AllDefsListForReading, sets)}");
         }
+
+        private void AddSessionHooks()
+        {
+            // Must go AFTER a successful connection attempt
+            Session.Items.ItemReceived += (receivedItemsHelper) =>
+            {
+                var itemReceivedName = receivedItemsHelper.PeekItemName();
+                Log.Message($"Received Item: {itemReceivedName}");
+
+                var networkItem = receivedItemsHelper.DequeueItem();
+                if (RimWorldArchipelagoMod.ArchipeligoIdToDef.ContainsKey(networkItem.Item))
+                {
+                    var defMapping = RimWorldArchipelagoMod.ArchipeligoIdToDef[networkItem.Item];
+                    var defName = defMapping.Item1;
+                    var defType = defMapping.Item2;
+                    // TODO something other than ResearchTabDef
+                    var def = DefDatabase<ResearchProjectDef>.GetNamed(defName, true);
+                    Find.ResearchManager.FinishProject(def);
+                }
+                else
+                {
+                    Log.Error($"Could not find RimWorld DefName associated with Archipelago item id {networkItem.Item}");
+                }
+            };
+        }
+
+
+
     }
 }
+

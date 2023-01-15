@@ -47,8 +47,8 @@ namespace RimworldArchipelago.Client.UI
 
     public class ArchipelagoOptionsMenu : Window
     {
-        public string address = RimworldArchipelagoMod.Address;
-        public string slotName = RimworldArchipelagoMod.PlayerSlot;
+        public string address = RimWorldArchipelagoMod.Address;
+        public string slotName = RimWorldArchipelagoMod.PlayerSlot;
         public string acceptBtnLabel;
         public string closeBtnLabel;
         public ArchipelagoOptionsMenu()
@@ -95,7 +95,7 @@ namespace RimworldArchipelago.Client.UI
         {
             Log.Message($"address: {address}");
             Log.Message($"slotName: {slotName}");
-            return RimworldArchipelagoMod.Connect(address, slotName);
+            return RimWorldArchipelagoMod.Connect(address, slotName);
         }
     }
 }

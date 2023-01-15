@@ -15,8 +15,8 @@ namespace RimworldArchipelago.Client
             //Log.Message($"Assembly.GetCallingAssembly: {Assembly.GetCallingAssembly()?.FullName}");
             //Log.Message($"Assembly.GetEntryAssembly: {Assembly.GetEntryAssembly()?.FullName}");
             //Harmony.DEBUG = true;
-            RimworldArchipelagoMod.Harmony = new Harmony("rimworld.mod.ad.archipelago");
-            RimworldArchipelagoMod.Harmony.PatchAll(Assembly.GetExecutingAssembly());
+            RimWorldArchipelagoMod.Harmony = new Harmony("rimworld.mod.ad.archipelago");
+            RimWorldArchipelagoMod.Harmony.PatchAll(Assembly.GetExecutingAssembly());
             Log.Message("Archipelago mod loaded.");
         }
     }

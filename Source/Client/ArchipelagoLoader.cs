@@ -1,5 +1,6 @@
 ﻿using Archipelago.MultiClient.Net;
 using Archipelago.MultiClient.Net.Helpers;
+using Archipelago.MultiClient.Net.Models;
 using Newtonsoft.Json;
 using RimWorld;
 using RimworldArchipelago.Client;
@@ -12,11 +13,15 @@ using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading.Tasks;
+using UnityEngine;
 using Verse;
 using static RimworldArchipelago.ArchipelagoLoader;
 
 namespace RimworldArchipelago
 {
+    /// <summary>
+    /// Loads the initial data for archipelago locations and items
+    /// </summary>
     public class ArchipelagoLoader
     {
         public class Location
@@ -41,10 +46,14 @@ namespace RimworldArchipelago
         public readonly IDictionary<long, Location> Researches = new ConcurrentDictionary<long, Location>();
         public readonly IDictionary<long, Location> Crafts = new ConcurrentDictionary<long, Location>();
         public readonly IDictionary<long, Location> Purchases = new ConcurrentDictionary<long, Location>();
-        public IDictionary<string, object> SlotData { get; private set; }
         public int CurrentPlayerId;
+        private IDictionary<string, object> SlotData { get; set; }
 
-        public ArchipelagoSession Session => RimWorldArchipelagoMod.Session;
+
+        private ArchipelagoSession Session => RimWorldArchipelagoMod.Session;
+
+        private bool isArchipelagoLoaded = false;
+        private IEnumerable<ResearchProjectDef> originalResearchProjectDefs;
 
         public ArchipelagoLoader()
         {
@@ -57,27 +66,64 @@ namespace RimworldArchipelago
             Log.Message("ArchipelagoLoader started...");
             try
             {
-                Debug.Assert(Session != null);
+                System.Diagnostics.Debug.Assert(Session != null);
+                if (isArchipelagoLoaded)
+                    Unload();
+
                 Players = Session.Players.AllPlayers.ToDictionary(x => x.Slot);
                 CurrentPlayerId = Players.First(kvp => kvp.Value.Name == RimWorldArchipelagoMod.PlayerSlot).Key;
                 SlotData = await Session.DataStorage.GetSlotDataAsync(CurrentPlayerId);
-
-
                 LoadRimworldDefMaps();
                 await LoadLocationDictionary();
                 LoadResearchDefs();
                 AddSessionHooks();
+
+                isArchipelagoLoaded = true;
             }
             catch (Exception ex) { Log.Error(ex.Message + "\n" + ex.StackTrace); }
         }
+
+        /// <summary>
+        /// Only really needed if we want to connect to another archipelago session with different settings without just reloading the whole game
+        /// </summary>
+        public void Unload()
+        {
+            // unload stuff added to rimworld
+            // is there no better way than this? :-/
+            DefDatabase<ResearchProjectDef>.ClearCachedData();
+            DefDatabase<ResearchProjectDef>.Clear();
+            DefDatabase<ResearchProjectDef>.Add(originalResearchProjectDefs);
+
+            // Empty out our data mappings and stuff
+            Researches.Clear();
+            Crafts.Clear();
+            Purchases.Clear();
+            Players.Clear();
+            SlotData.Clear();
+            RimWorldArchipelagoMod.ReceivedItems.Clear();
+            isArchipelagoLoaded = false;
+        }
+
+        /// <summary>
+        /// Build the mappings from numerical archipelago ids to rimworld string def names. 
+        /// They have to be filled in from info received from Archipelago in SlotData.
+        /// </summary>
         private void LoadRimworldDefMaps()
         {
             var defNameMap = JsonConvert.DeserializeObject<Dictionary<long, string[]>>(SlotData["defNameMap"].ToString());
             foreach (var kvp in defNameMap)
             {
-                RimWorldArchipelagoMod.ArchipeligoIdToDef[kvp.Key] = Tuple.Create(kvp.Value[0], kvp.Value[1]);
+                RimWorldArchipelagoMod.ArchipeligoItemIdToRimWorldDef[kvp.Key] = new RimWorldArchipelagoMod.RimWorldDef()
+                {
+                    DefName = kvp.Value[0],
+                    DefType = kvp.Value[1]
+                };
             }
         }
+
+        /// <summary>
+        /// Fill the locations dictionary, which maps the archipelago's numeric location ids to data we can use internally
+        /// </summary>
         private async Task LoadLocationDictionary()
         {
             var hints = await Session.DataStorage.GetHintsAsync();
@@ -170,12 +216,13 @@ namespace RimworldArchipelago
             {
                 kvp.Value.prerequisites = techTree[kvp.Key].prerequisites.Select(x => newResearchDefs[x]).ToList();
             }
-
+            originalResearchProjectDefs = DefDatabase<ResearchProjectDef>.AllDefs.ToList();
             DefDatabase<ResearchProjectDef>.Add(newResearchDefs.Values);
             var researchesAfter = DefDatabase<ResearchProjectDef>.DefCount;
             Log.Message($"number of researches after: {researchesAfter}");
             ResearchProjectDef.GenerateNonOverlappingCoordinates();
         }
+
 
         private void AddSessionHooks()
         {
@@ -184,24 +231,18 @@ namespace RimworldArchipelago
             {
                 var itemReceivedName = receivedItemsHelper.PeekItemName();
                 Log.Message($"Received Item: {itemReceivedName}");
-
                 var networkItem = receivedItemsHelper.DequeueItem();
-                if (RimWorldArchipelagoMod.ArchipeligoIdToDef.ContainsKey(networkItem.Item))
+                RimWorldArchipelagoMod.ReceiveItem(networkItem.Item);
+            };
+
+            Session.MessageLog.OnMessageReceived += (message) =>
+            {
+                foreach (var part in message.Parts)
                 {
-                    var defMapping = RimWorldArchipelagoMod.ArchipeligoIdToDef[networkItem.Item];
-                    var defName = defMapping.Item1;
-                    var defType = defMapping.Item2;
-                    // TODO something other than ResearchTabDef
-                    var def = DefDatabase<ResearchProjectDef>.GetNamed(defName, true);
-                    Find.ResearchManager.FinishProject(def);
-                }
-                else
-                {
-                    Log.Error($"Could not find RimWorld DefName associated with Archipelago item id {networkItem.Item}");
+                    //TODO alert?
                 }
             };
         }
-
 
 
     }

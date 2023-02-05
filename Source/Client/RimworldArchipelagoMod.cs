@@ -24,6 +24,19 @@ namespace RimworldArchipelago.Client
         public static string PlayerSlot { get; private set; } = "";
 
         public static ArchipelagoLoader ArchipelagoLoader { get; private set; }
+        public struct RimWorldDef { public string DefName; public string DefType; }
+
+        public static readonly IDictionary<string, long> DefNameToArchipelagoId = new ConcurrentDictionary<string, long>();
+        public static readonly IDictionary<long, RimWorldDef> ArchipeligoItemIdToRimWorldDef = new ConcurrentDictionary<long, RimWorldDef>();
+
+        /// <summary>
+        /// Archipelago Item Ids that have already been received in this game
+        /// </summary>
+        public static readonly ISet<long> ReceivedItems = new HashSet<long>();
+        /// <summary>
+        /// Archipelago Item Ids that we are not yet able to receive (because are not in a game with a home base currently)
+        /// </summary>
+        public static readonly ISet<long> ItemsAwaitingReceipt = new HashSet<long>(); //TODO actually receive these things later somehow.
 
         public RimWorldArchipelagoMod(ModContentPack content) : base(content)
         {
@@ -91,14 +104,50 @@ namespace RimworldArchipelago.Client
             return true;
         }
 
-        public static readonly IDictionary<string, long> DefNameToArchipelagoId = new ConcurrentDictionary<string, long>();
-
-        public static readonly IDictionary<long, Tuple<string, string>> ArchipeligoIdToDef = new ConcurrentDictionary<long, Tuple<string, string>>();
-
         public static void SendLocationCheck(string defName)
         {
             Log.Message($"Sending completed location {defName} to Archipelago");
             Session.Locations.CompleteLocationChecks(DefNameToArchipelagoId[defName]);
         }
+
+        public static void ReceiveItem(long archipelagoItemId)
+        {
+            // check that we are actually ready to receive items
+            var home = Find.AnyPlayerHomeMap;
+            if (home == null)
+            {
+                RimWorldArchipelagoMod.ItemsAwaitingReceipt.Add(archipelagoItemId);
+                return;
+            }
+
+            if (RimWorldArchipelagoMod.ItemsAwaitingReceipt.Contains(archipelagoItemId))
+            {
+                RimWorldArchipelagoMod.ItemsAwaitingReceipt.Remove(archipelagoItemId);
+            }
+            RimWorldArchipelagoMod.ReceivedItems.Add(archipelagoItemId);
+
+            if (RimWorldArchipelagoMod.ArchipeligoItemIdToRimWorldDef.ContainsKey(archipelagoItemId))
+            {
+                var defMapping = RimWorldArchipelagoMod.ArchipeligoItemIdToRimWorldDef[archipelagoItemId];
+                var defName = defMapping.DefName;
+                var defType = defMapping.DefType;
+
+                // TODO something other than ResearchProjectDef
+                if (defType == "ResearchProjectDef")
+                {
+                    var def = DefDatabase<ResearchProjectDef>.GetNamed(defName, true);
+                    Find.ResearchManager.FinishProject(def);
+                }
+                else
+                {
+                    Log.Error($"Unrecognized RimWorld DefType {defType} associated with Archipelago item id {archipelagoItemId}");
+                }
+            }
+            else
+            {
+                Log.Error($"Could not find RimWorld Def associated with Archipelago item id {archipelagoItemId}");
+            }
+        }
+
     }
 }

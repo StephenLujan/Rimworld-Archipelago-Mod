@@ -22,6 +22,7 @@
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
     <FileAlignment>1024</FileAlignment>
+    <GenerateSerializationAssemblies>Off</GenerateSerializationAssemblies>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <DebugType>pdbonly</DebugType>
@@ -33,10 +34,11 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="Client\ArchipelagoLoader.cs" />
+    <Compile Include="Client\ArchipelagoRecipeWorker.cs" />
     <Compile Include="Client\ArchipelagoStatic.cs" />
+    <Compile Include="Client\ArchipelagoWorldData.cs" />
     <Compile Include="Client\ResearchPatch.cs" />
     <Compile Include="Client\RimworldArchipelagoMod.cs" />
-    <Compile Include="Client\SaveLoadPatch.cs" />
     <Compile Include="Client\UI\ArchipelagoAlert.cs" />
     <Compile Include="Client\UI\MainMenuPatches.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
@@ -50,6 +52,9 @@
     </PackageReference>
     <PackageReference Include="Lib.Harmony">
       <Version>2.2.2</Version>
+    </PackageReference>
+    <PackageReference Include="UnlimitedHugs.Rimworld.HugsLib">
+      <Version>10.0.1</Version>
     </PackageReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />

@@ -1,21 +1,15 @@
 ﻿using Archipelago.MultiClient.Net;
 using Archipelago.MultiClient.Net.Helpers;
-using Archipelago.MultiClient.Net.Models;
 using Newtonsoft.Json;
 using RimWorld;
 using RimworldArchipelago.Client;
-using Steamworks;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Linq;
-using System.Runtime.CompilerServices;
-using System.Text;
 using System.Threading.Tasks;
-using UnityEngine;
 using Verse;
-using static RimworldArchipelago.ArchipelagoLoader;
+using Verse.Noise;
 
 namespace RimworldArchipelago
 {
@@ -30,7 +24,7 @@ namespace RimworldArchipelago
             public long ItemId;
             public string ItemName;
             public int Player;
-            public string ExtendedItemName;
+            public string ExtendedLabel;
         }
 
         public class LocationResearchMetaData
@@ -43,17 +37,19 @@ namespace RimworldArchipelago
 
         public IDictionary<int, PlayerInfo> Players { get; private set; }
 
-        public readonly IDictionary<long, Location> Researches = new ConcurrentDictionary<long, Location>();
-        public readonly IDictionary<long, Location> Crafts = new ConcurrentDictionary<long, Location>();
-        public readonly IDictionary<long, Location> Purchases = new ConcurrentDictionary<long, Location>();
+        public readonly IDictionary<long, Location> ResearchLocations = new ConcurrentDictionary<long, Location>();
+        public readonly IDictionary<long, Location> CraftLocations = new ConcurrentDictionary<long, Location>();
+        public readonly IDictionary<long, Location> PurchasLocations = new ConcurrentDictionary<long, Location>();
         public int CurrentPlayerId;
         private IDictionary<string, object> SlotData { get; set; }
+
+        public readonly IDictionary<long, ResearchProjectDef> AddedResearchDefs = new Dictionary<long, ResearchProjectDef>();
+        public readonly IDictionary<long, RecipeDef> AddedRecipeDefs = new Dictionary<long, RecipeDef>();
 
 
         private ArchipelagoSession Session => RimWorldArchipelagoMod.Session;
 
         private bool isArchipelagoLoaded = false;
-        private IEnumerable<ResearchProjectDef> originalResearchProjectDefs;
 
         public ArchipelagoLoader()
         {
@@ -76,6 +72,7 @@ namespace RimworldArchipelago
                 LoadRimworldDefMaps();
                 await LoadLocationDictionary();
                 LoadResearchDefs();
+                LoadCraftDefs();
                 AddSessionHooks();
 
                 isArchipelagoLoaded = true;
@@ -89,18 +86,17 @@ namespace RimworldArchipelago
         public void Unload()
         {
             // unload stuff added to rimworld
-            // is there no better way than this? :-/
-            DefDatabase<ResearchProjectDef>.ClearCachedData();
+            // TODO this doesn't work anyway
             DefDatabase<ResearchProjectDef>.Clear();
-            DefDatabase<ResearchProjectDef>.Add(originalResearchProjectDefs);
+            DefDatabase<ResearchProjectDef>.ClearCachedData();
 
             // Empty out our data mappings and stuff
-            Researches.Clear();
-            Crafts.Clear();
-            Purchases.Clear();
+            ResearchLocations.Clear();
+            CraftLocations.Clear();
+            PurchasLocations.Clear();
             Players.Clear();
             SlotData.Clear();
-            RimWorldArchipelagoMod.ReceivedItems.Clear();
+            //RimWorldArchipelagoMod.ReceivedItems.Clear();
             isArchipelagoLoaded = false;
         }
 
@@ -151,19 +147,19 @@ namespace RimworldArchipelago
                             ItemName = itemName,
                             Name = locationName,
                             Player = item.Player,
-                            ExtendedItemName = $"{Players[item.Player].Name}'s {itemName}"
+                            ExtendedLabel = $"{Players[item.Player].Name}'s {itemName}"
                         };
-                        if (locationId >= 11_000 && locationId < 12_000)
+                        if (RimWorldArchipelagoMod.IsResearchLocation(locationId))
                         {
-                            Researches[locationId] = location;
+                            ResearchLocations[locationId] = location;
                         }
-                        else if (locationId >= 12_000 && locationId < 13_000)
+                        else if (RimWorldArchipelagoMod.IsCraftLocation(locationId))
                         {
-                            Crafts[locationId] = location;
+                            CraftLocations[locationId] = location;
                         }
-                        else if (locationId >= 13_000 && locationId < 14_000)
+                        else if (RimWorldArchipelagoMod.IsPurchaseLocation(locationId))
                         {
-                            Purchases[locationId] = location;
+                            PurchasLocations[locationId] = location;
                         }
                         else
                         {
@@ -173,9 +169,9 @@ namespace RimworldArchipelago
                     catch (Exception ex) { Log.Error(ex.Message + "\n" + ex.StackTrace); }
                 });
 
-            Log.Message(" Researches: " + JsonConvert.SerializeObject(Researches));
-            Log.Message(" Crafts: " + JsonConvert.SerializeObject(Crafts));
-            Log.Message(" Purchases: " + JsonConvert.SerializeObject(Purchases));
+            Log.Message(" Researches: " + JsonConvert.SerializeObject(ResearchLocations));
+            Log.Message(" Crafts: " + JsonConvert.SerializeObject(CraftLocations));
+            Log.Message(" Purchases: " + JsonConvert.SerializeObject(PurchasLocations));
         }
 
         /// <summary>
@@ -184,43 +180,111 @@ namespace RimworldArchipelago
         /// </summary>
         private void LoadResearchDefs()
         {
-            JsonSerializerSettings sets = new JsonSerializerSettings
-            {
-                PreserveReferencesHandling = PreserveReferencesHandling.Objects
-            };
+            // get archipelago research tab
             var tab = DefDatabase<ResearchTabDef>.GetNamed("AD_Archipelago");
             var researchesBefore = DefDatabase<ResearchProjectDef>.DefCount;
             Log.Message($"number of researches before: {researchesBefore}");
-
-
             var techTree = JsonConvert.DeserializeObject<Dictionary<long, LocationResearchMetaData>>(SlotData["techTree"].ToString());
-            var newResearchDefs = new Dictionary<long, ResearchProjectDef>();
+            
             foreach (var kvp in techTree)
             {
-                var locationData = Researches[kvp.Key];
+                var locationData = ResearchLocations[kvp.Key];
                 var def = new ResearchProjectDef()
                 {
                     baseCost = kvp.Value.cost,
                     defName = $"AP_{kvp.Key}",
-                    description = locationData.ExtendedItemName + $" (AP_{kvp.Key})",
-                    label = locationData.ExtendedItemName,
+                    description = locationData.ExtendedLabel + $" (AP_{kvp.Key})",
+                    label = locationData.ExtendedLabel,
                     tab = tab,
                     researchViewX = kvp.Value.x,
-                    researchViewY = kvp.Value.y,
-
+                    researchViewY = kvp.Value.y
                 };
-                newResearchDefs.Add(kvp.Key, def);
+                AddedResearchDefs.Add(kvp.Key, def);
                 RimWorldArchipelagoMod.DefNameToArchipelagoId[def.defName] = kvp.Key;
             }
-            foreach (var kvp in newResearchDefs)
+            foreach (var kvp in AddedResearchDefs)
             {
-                kvp.Value.prerequisites = techTree[kvp.Key].prerequisites.Select(x => newResearchDefs[x]).ToList();
+                kvp.Value.prerequisites = techTree[kvp.Key].prerequisites.Select(x => AddedResearchDefs[x]).ToList();
             }
-            originalResearchProjectDefs = DefDatabase<ResearchProjectDef>.AllDefs.ToList();
-            DefDatabase<ResearchProjectDef>.Add(newResearchDefs.Values);
+
+            DefDatabase<ResearchProjectDef>.Add(AddedResearchDefs.Values);
             var researchesAfter = DefDatabase<ResearchProjectDef>.DefCount;
             Log.Message($"number of researches after: {researchesAfter}");
             ResearchProjectDef.GenerateNonOverlappingCoordinates();
+        }
+
+        private void LoadCraftDefs()
+        {
+            //get new archipelago crafting table and other constant recipe properties
+            var recipeUsers = new List<ThingDef>(){ DefDatabase<ThingDef>.GetNamed("AD_ArchipelagoBench") };
+            var workSkill = DefDatabase<SkillDef>.GetNamed("Crafting");
+            var effectWorking = DefDatabase<EffecterDef>.GetNamed("Cook");
+            var soundWorking = DefDatabase<SoundDef>.GetNamed("Recipe_Machining");
+            var workSpeedStat = DefDatabase<StatDef>.GetNamed("GeneralLaborSpeed");
+
+            /*
+             * Log.Message(string.Join(", " , DefDatabase<ThingCategoryDef>.AllDefsListForReading.Select(x => x.defName).ToArray()));
+             * Root, Foods, FoodMeals, FoodRaw, MeatRaw, PlantFoodRaw, AnimalProductRaw, EggsUnfertilized, EggsFertilized, Manufactured,
+             * Textiles, Leathers, Wools, Medicine, Drugs, MortarShells, ResourcesRaw, PlantMatter, StoneBlocks, Items, Unfinished, Artifacts,
+             * InertRelics, Neurotrainers, NeurotrainersPsycast, NeurotrainersSkill, Techprints, BodyParts, BodyPartsNatural, BodyPartsSimple,
+             * BodyPartsProsthetic, BodyPartsBionic, BodyPartsUltra, BodyPartsArchotech, BodyPartsMechtech, ItemsMisc, Weapons, WeaponsMelee,
+             * WeaponsMeleeBladelink, WeaponsRanged, Grenades, Apparel, Headgear, ApparelArmor, ArmorHeadgear, ApparelUtility, ApparelNoble,
+             * HeadgearNoble, ApparelMisc, Buildings, BuildingsArt, BuildingsProduction, BuildingsFurniture, BuildingsPower, BuildingsSecurity,
+             * BuildingsMisc, BuildingsJoy, BuildingsTemperature, BuildingsSpecial, Chunks, StoneChunks, Animals, Plants, Stumps, Corpses,
+             * CorpsesHumanlike, CorpsesAnimal, CorpsesInsect, CorpsesMechanoid
+             */
+
+            Func<string, ThingFilter> makeFilter = (string s) => new ThingFilter()
+            {
+                DisplayRootCategory = DefDatabase<ThingCategoryDef>.GetNamed(s).treeNode
+            };
+
+            var leathersFilter = makeFilter("Leathers");
+            var textilesFilter = makeFilter("Textiles");
+            var woolsFilter = makeFilter("Textiles");
+            var stoneBlocksFilter = makeFilter("StoneBlocks");
+            var foodRawFilter = makeFilter("FoodRaw");
+            var filters = new List<ThingFilter>() { leathersFilter, textilesFilter, woolsFilter, stoneBlocksFilter, foodRawFilter };
+
+            Func<ThingFilter, float, IngredientCount> makeIngredientCount = (ThingFilter filter, float count) =>
+            {
+                var output = new IngredientCount()
+                {
+                    filter = filter,
+                };
+                output.SetBaseCount(count);
+                return output;
+            };
+
+            foreach (var kvp in CraftLocations)
+            {
+
+                var filter = Verse.Rand.Element(leathersFilter, textilesFilter, woolsFilter, stoneBlocksFilter, foodRawFilter);
+                var def = new RecipeDef()
+                {
+                    defName = $"AP_{kvp.Key}",
+                    label = kvp.Value.ExtendedLabel,
+                    description = kvp.Value.ExtendedLabel + $" (AP_{kvp.Key})",
+                    recipeUsers = recipeUsers,
+                    workerClass = typeof(ArchipelagoRecipeWorker),
+                    workSkill = workSkill,
+                    workAmount = 1000, //TODO configurable
+                    workSpeedStat = workSpeedStat,
+                    allowMixingIngredients = true,
+                    effectWorking = effectWorking,
+                    soundWorking = soundWorking,
+                    ingredients = new List<IngredientCount>()
+                    {
+                        makeIngredientCount(filter, 2)
+                    },
+                    fixedIngredientFilter = filter,
+                    defaultIngredientFilter = filter,
+                    //targetCountAdjustment=50
+                };
+                AddedRecipeDefs.Add(kvp.Key, def);
+                RimWorldArchipelagoMod.DefNameToArchipelagoId[def.defName] = kvp.Key;
+            }
+            DefDatabase<RecipeDef>.Add(AddedRecipeDefs.Values);
         }
 
 
@@ -232,14 +296,15 @@ namespace RimworldArchipelago
                 var itemReceivedName = receivedItemsHelper.PeekItemName();
                 Log.Message($"Received Item: {itemReceivedName}");
                 var networkItem = receivedItemsHelper.DequeueItem();
-                RimWorldArchipelagoMod.ReceiveItem(networkItem.Item);
+                ArchipelagoWorldComp.ReceiveItem(networkItem.Item);
             };
 
             Session.MessageLog.OnMessageReceived += (message) =>
             {
                 foreach (var part in message.Parts)
                 {
-                    //TODO alert?
+                    //Find.LetterStack.ReceiveLetter(part.Text, part.Text, LetterDefOf.NeutralEvent);
+                    Messages.Message(part.Text, MessageTypeDefOf.SilentInput, false);
                 }
             };
         }

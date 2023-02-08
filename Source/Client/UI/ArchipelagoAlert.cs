@@ -10,12 +10,15 @@ namespace RimworldArchipelago.Client.UI
 {
     public class ArchipelagoAlert : Alert
     {
+        public ArchipelagoAlert()
+        {
+        }
+
         public ArchipelagoAlert(string label, string explanation)
         {
             defaultPriority = AlertPriority.Medium;
             defaultLabel = label;
             defaultExplanation = explanation;
-            this.
         }
 
         public override AlertReport GetReport()

@@ -47,7 +47,7 @@
   <!-- ========================= Work tables ==========================-->
 
   <ThingDef ParentName="BenchBase">
-    <defName>ArchipelagoBench</defName>
+    <defName>AD_ArchipelagoBench</defName>
     <label>Archipelago Bench</label>
     <description>A workstation for archipelago.</description>
 	<thingClass>Building_WorkTable</thingClass>

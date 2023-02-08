@@ -16,10 +16,10 @@ namespace RimworldArchipelago.Client
         //public void FinishProject(ResearchProjectDef proj, bool doCompletionDialog = false, Pawn researcher = null, bool doCompletionLetter = true)
         public static bool Prefix(ref ResearchProjectDef proj, ref bool doCompletionDialog, ref Pawn researcher, ref bool doCompletionLetter)
         {
-            if (RimWorldArchipelagoMod.DefNameToArchipelagoId.ContainsKey(proj.defName))
+            if (Main.Instance.DefNameToArchipelagoId.ContainsKey(proj.defName))
             {
-                RimWorldArchipelagoMod.SendLocationCheck(proj.defName);
-            } 
+                Main.Instance.SendLocationCheck(proj.defName);
+            }
             return true;
         }
     }

@@ -2,6 +2,7 @@
 using Archipelago.MultiClient.Net.Enums;
 using HarmonyLib;
 using HugsLib;
+using HugsLib.Utils;
 using Newtonsoft.Json;
 using System;
 using System.Collections.Concurrent;
@@ -15,26 +16,34 @@ using Verse;
 
 namespace RimworldArchipelago.Client
 {
-    public class RimWorldArchipelagoMod : ModBase
+
+    public class Main : HugsLib.ModBase
     {
+        public Main()
+        {
+            Instance = this;
+        }
+        internal static Main Instance { get; private set; }
 
-        public static Harmony Harmony;
-        public static ArchipelagoSession Session;
+        public ModLogger Log => base.Logger;
 
-        public static string Address { get; private set; } = "127.0.0.1:38281";
-        public static string PlayerSlot { get; private set; } = "";
+        //public Harmony Harmony;
+        public ArchipelagoSession Session;
 
-        public static ArchipelagoLoader ArchipelagoLoader { get; private set; }
+        public string Address { get; private set; } = "127.0.0.1:38281";
+        public string PlayerSlot { get; private set; } = "";
+
+        public ArchipelagoLoader ArchipelagoLoader { get; private set; }
         public struct RimWorldDef { public string DefName; public string DefType; public int Quantity; }
 
-        public static readonly IDictionary<string, long> DefNameToArchipelagoId = new ConcurrentDictionary<string, long>();
-        public static readonly IDictionary<long, RimWorldDef> ArchipeligoItemIdToRimWorldDef = new ConcurrentDictionary<long, RimWorldDef>();
+        public readonly IDictionary<string, long> DefNameToArchipelagoId = new ConcurrentDictionary<string, long>();
+        public readonly IDictionary<long, RimWorldDef> ArchipeligoItemIdToRimWorldDef = new ConcurrentDictionary<long, RimWorldDef>();
 
         public static bool IsResearchLocation(long id) => id >= 11_000 && id < 12_000;
         public static bool IsCraftLocation(long id) => id >= 12_000 && id < 13_000;
         public static bool IsPurchaseLocation(long id) => id >= 13_000 && id < 14_000;
 
-        public static bool Connect(string address, string playerSlot, string password = null)
+        public bool Connect(string address, string playerSlot, string password = null)
         {
             Log.Message("Connecting to Archipelago...");
             // store address & player slot even if invalid if there is no session yet
@@ -95,14 +104,14 @@ namespace RimworldArchipelago.Client
             return true;
         }
 
-        public static void SendLocationCheck(string defName)
+        public void SendLocationCheck(string defName)
         {
             Log.Message($"Sending completed location {defName} to Archipelago");
             Session.Locations.CompleteLocationChecks(DefNameToArchipelagoId[defName]);
             DisableLocation(defName);
         }
 
-        public static void DisableLocation(string defName)
+        public void DisableLocation(string defName)
         {
             var id = DefNameToArchipelagoId[defName];
             if (IsResearchLocation(id))
@@ -116,8 +125,6 @@ namespace RimworldArchipelago.Client
                 def.recipeUsers.RemoveAt(0); //TODO test that this removes recipe
             }
         }
-
-
 
     }
 }

@@ -1,4 +1,5 @@
 ﻿using Archipelago.MultiClient.Net.Helpers;
+using HugsLib.Utils;
 using Newtonsoft.Json;
 using RimWorld.Planet;
 using Steamworks;
@@ -14,6 +15,7 @@ namespace RimworldArchipelago.Client
 
     public static class ArchipelagoWorldComp
     {
+        private static ModLogger Log => Main.Instance.Log;
         internal static HashSet<long> ItemsAwaitingReceipt = new HashSet<long>();
 
         private static ArchipelagoWorldData comp => Find.World?.GetComponent<ArchipelagoWorldData>();
@@ -33,6 +35,8 @@ namespace RimworldArchipelago.Client
 
     public class ArchipelagoWorldData : RimWorld.Planet.WorldComponent
     {
+        private static ModLogger Log => Main.Instance.Log;
+
         private HashSet<long> ReceivedItems = new HashSet<long>();
 
         public ArchipelagoWorldData(World world) : base(world)
@@ -50,9 +54,9 @@ namespace RimworldArchipelago.Client
             }
             ReceivedItems.Add(archipelagoItemId);
 
-            if (RimWorldArchipelagoMod.ArchipeligoItemIdToRimWorldDef.ContainsKey(archipelagoItemId))
+            if (Main.Instance.ArchipeligoItemIdToRimWorldDef.ContainsKey(archipelagoItemId))
             {
-                var defMapping = RimWorldArchipelagoMod.ArchipeligoItemIdToRimWorldDef[archipelagoItemId];
+                var defMapping = Main.Instance.ArchipeligoItemIdToRimWorldDef[archipelagoItemId];
                 var defName = defMapping.DefName;
                 var defType = defMapping.DefType;
 

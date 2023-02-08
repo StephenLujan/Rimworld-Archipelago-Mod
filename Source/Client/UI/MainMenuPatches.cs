@@ -1,4 +1,5 @@
 ﻿using HarmonyLib;
+using HugsLib.Utils;
 using RimWorld;
 using System.Collections.Generic;
 using System.Linq;
@@ -47,8 +48,9 @@ namespace RimworldArchipelago.Client.UI
 
     public class ArchipelagoOptionsMenu : Window
     {
-        public string address = RimWorldArchipelagoMod.Address;
-        public string slotName = RimWorldArchipelagoMod.PlayerSlot;
+        private static ModLogger Log => Main.Instance.Log;
+        public string address = Main.Instance.Address;
+        public string slotName = Main.Instance.PlayerSlot;
         public string acceptBtnLabel;
         public string closeBtnLabel;
         public ArchipelagoOptionsMenu()
@@ -95,7 +97,7 @@ namespace RimworldArchipelago.Client.UI
         {
             Log.Message($"address: {address}");
             Log.Message($"slotName: {slotName}");
-            return RimWorldArchipelagoMod.Connect(address, slotName);
+            return Main.Instance.Connect(address, slotName);
         }
     }
 }

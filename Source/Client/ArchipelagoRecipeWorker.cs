@@ -14,7 +14,7 @@ namespace RimworldArchipelago.Client
         public override void Notify_IterationCompleted(Pawn billDoer, List<Thing> ingredients)
         {
             base.Notify_IterationCompleted(billDoer, ingredients);
-            RimWorldArchipelagoMod.SendLocationCheck(recipe.defName);
+            Main.Instance.SendLocationCheck(recipe.defName);
         }
     }
 }

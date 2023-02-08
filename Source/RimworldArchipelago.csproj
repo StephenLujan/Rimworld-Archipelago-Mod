@@ -35,7 +35,6 @@
   <ItemGroup>
     <Compile Include="Client\ArchipelagoLoader.cs" />
     <Compile Include="Client\ArchipelagoRecipeWorker.cs" />
-    <Compile Include="Client\ArchipelagoStatic.cs" />
     <Compile Include="Client\ArchipelagoWorldData.cs" />
     <Compile Include="Client\ResearchPatch.cs" />
     <Compile Include="Client\RimworldArchipelagoMod.cs" />

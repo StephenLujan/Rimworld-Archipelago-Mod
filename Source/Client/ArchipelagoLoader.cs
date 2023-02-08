@@ -1,5 +1,6 @@
 ﻿using Archipelago.MultiClient.Net;
 using Archipelago.MultiClient.Net.Helpers;
+using HugsLib.Utils;
 using Newtonsoft.Json;
 using RimWorld;
 using RimworldArchipelago.Client;
@@ -18,6 +19,7 @@ namespace RimworldArchipelago
     /// </summary>
     public class ArchipelagoLoader
     {
+        private static ModLogger Log => Main.Instance.Log;
         public class Location
         {
             public string Name;
@@ -47,7 +49,7 @@ namespace RimworldArchipelago
         public readonly IDictionary<long, RecipeDef> AddedRecipeDefs = new Dictionary<long, RecipeDef>();
 
 
-        private ArchipelagoSession Session => RimWorldArchipelagoMod.Session;
+        private ArchipelagoSession Session => Main.Instance.Session;
 
         private bool isArchipelagoLoaded = false;
 
@@ -67,7 +69,7 @@ namespace RimworldArchipelago
                     Unload();
 
                 Players = Session.Players.AllPlayers.ToDictionary(x => x.Slot);
-                CurrentPlayerId = Players.First(kvp => kvp.Value.Name == RimWorldArchipelagoMod.PlayerSlot).Key;
+                CurrentPlayerId = Players.First(kvp => kvp.Value.Name == Main.Instance.PlayerSlot).Key;
                 SlotData = await Session.DataStorage.GetSlotDataAsync(CurrentPlayerId);
                 LoadRimworldDefMaps();
                 await LoadLocationDictionary();
@@ -109,7 +111,7 @@ namespace RimworldArchipelago
             var defNameMap = JsonConvert.DeserializeObject<Dictionary<long, string[]>>(SlotData["defNameMap"].ToString());
             foreach (var kvp in defNameMap)
             {
-                RimWorldArchipelagoMod.ArchipeligoItemIdToRimWorldDef[kvp.Key] = new RimWorldArchipelagoMod.RimWorldDef()
+                Main.Instance.ArchipeligoItemIdToRimWorldDef[kvp.Key] = new Main.RimWorldDef()
                 {
                     DefName = kvp.Value[0],
                     DefType = kvp.Value[1]
@@ -149,15 +151,15 @@ namespace RimworldArchipelago
                             Player = item.Player,
                             ExtendedLabel = $"{Players[item.Player].Name}'s {itemName}"
                         };
-                        if (RimWorldArchipelagoMod.IsResearchLocation(locationId))
+                        if (Main.IsResearchLocation(locationId))
                         {
                             ResearchLocations[locationId] = location;
                         }
-                        else if (RimWorldArchipelagoMod.IsCraftLocation(locationId))
+                        else if (Main.IsCraftLocation(locationId))
                         {
                             CraftLocations[locationId] = location;
                         }
-                        else if (RimWorldArchipelagoMod.IsPurchaseLocation(locationId))
+                        else if (Main.IsPurchaseLocation(locationId))
                         {
                             PurchasLocations[locationId] = location;
                         }
@@ -200,7 +202,7 @@ namespace RimworldArchipelago
                     researchViewY = kvp.Value.y
                 };
                 AddedResearchDefs.Add(kvp.Key, def);
-                RimWorldArchipelagoMod.DefNameToArchipelagoId[def.defName] = kvp.Key;
+                Main.Instance.DefNameToArchipelagoId[def.defName] = kvp.Key;
             }
             foreach (var kvp in AddedResearchDefs)
             {
@@ -282,7 +284,7 @@ namespace RimworldArchipelago
                     //targetCountAdjustment=50
                 };
                 AddedRecipeDefs.Add(kvp.Key, def);
-                RimWorldArchipelagoMod.DefNameToArchipelagoId[def.defName] = kvp.Key;
+                Main.Instance.DefNameToArchipelagoId[def.defName] = kvp.Key;
             }
             DefDatabase<RecipeDef>.Add(AddedRecipeDefs.Values);
         }

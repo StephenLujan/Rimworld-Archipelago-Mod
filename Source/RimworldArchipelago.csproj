@@ -37,7 +37,7 @@
     <Compile Include="Client\ArchipelagoRecipeWorker.cs" />
     <Compile Include="Client\ArchipelagoWorldData.cs" />
     <Compile Include="Client\ResearchPatch.cs" />
-    <Compile Include="Client\RimworldArchipelagoMod.cs" />
+    <Compile Include="Client\Main.cs" />
     <Compile Include="Client\UI\ArchipelagoAlert.cs" />
     <Compile Include="Client\UI\MainMenuPatches.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />

@@ -36,10 +36,21 @@ namespace RimworldArchipelago.Client.UI
                 int newColony = optList.FindIndex(opt => opt.label == "NewColony".Translate());
                 if (newColony != -1)
                 {
-                    optList.Insert(newColony + 1, new ListableOption("Archipelago", () =>
+                    if (Main.Instance.Session == null)
                     {
-                        Find.WindowStack.Add(new ArchipelagoOptionsMenu());
-                    }));
+                        optList.Insert(newColony + 1, new ListableOption("Archipelago", () =>
+                        {
+                            Find.WindowStack.Add(new ArchipelagoOptionsMenu());
+                        }));
+                    }
+                    else
+                    {
+                        optList.Insert(newColony + 1, new ListableOption("Connected!", () =>
+                        {
+                            Messages.Message("RimWorld can't unload Archipelago's changes.\nRestart RimWorld to connect to a different Archipelago server or player slot.",
+                                MessageTypeDefOf.SilentInput, false);
+                        }));
+                    }
                 }
             }
         }

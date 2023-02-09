@@ -31,19 +31,24 @@ namespace RimworldArchipelago.Client
             }
             comp.ReceiveItem(archipelagoItemId);
         }
+
+        public static void Reset()
+        {
+            ItemsAwaitingReceipt.Clear();
+            comp.ReceivedItems.Clear();
+        }
     }
 
     public class ArchipelagoWorldData : RimWorld.Planet.WorldComponent
     {
         private static ModLogger Log => Main.Instance.Log;
 
-        private HashSet<long> ReceivedItems = new HashSet<long>();
+        public HashSet<long> ReceivedItems = new HashSet<long>();
 
         public ArchipelagoWorldData(World world) : base(world)
         {
 
         }
-
 
 
         public void ReceiveItem(long archipelagoItemId)

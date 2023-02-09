@@ -19,6 +19,7 @@ namespace RimworldArchipelago.Client
 
     public class Main : HugsLib.ModBase
     {
+        public override string ModIdentifier => "Archipelago";
         public Main()
         {
             Instance = this;
@@ -31,7 +32,7 @@ namespace RimworldArchipelago.Client
         public ArchipelagoSession Session;
 
         public string Address { get; private set; } = "127.0.0.1:38281";
-        public string PlayerSlot { get; private set; } = "";
+        public string PlayerSlot { get; private set; } = "Player";
 
         public ArchipelagoLoader ArchipelagoLoader { get; private set; }
         public struct RimWorldDef { public string DefName; public string DefType; public int Quantity; }
@@ -55,14 +56,10 @@ namespace RimworldArchipelago.Client
             ArchipelagoSession newSession;
             if (address.Contains(':'))
             {
-                Log.Message("TODO");
                 newSession = ArchipelagoSessionFactory.CreateSession(new Uri($"ws://{address}"));
             }
             else
                 newSession = ArchipelagoSessionFactory.CreateSession(address);
-
-
-            Log.Message("Session created.");
 
             LoginResult result;
             try
@@ -95,8 +92,8 @@ namespace RimworldArchipelago.Client
             Session = newSession;
             Log.Message("Successfully Connected.");
             var loginSuccess = (LoginSuccessful)result;
-            Log.Message($"{loginSuccess}");
-            Log.Message(JsonConvert.SerializeObject(loginSuccess));
+            Log.Trace($"{loginSuccess}");
+            Log.Trace(JsonConvert.SerializeObject(loginSuccess));
 
             ArchipelagoLoader = new ArchipelagoLoader();
             _ = ArchipelagoLoader.Load();

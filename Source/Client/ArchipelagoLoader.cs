@@ -5,6 +5,7 @@ using Newtonsoft.Json;
 using RimWorld;
 using RimworldArchipelago.Client;
 using System;
+using System.Collections;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
@@ -68,15 +69,26 @@ namespace RimworldArchipelago
                 if (isArchipelagoLoaded)
                     Unload();
 
+                Log.Message("Loading players...");
                 Players = Session.Players.AllPlayers.ToDictionary(x => x.Slot);
                 CurrentPlayerId = Players.First(kvp => kvp.Value.Name == Main.Instance.PlayerSlot).Key;
+
+                Log.Message("Loading Slot Data...");
                 SlotData = await Session.DataStorage.GetSlotDataAsync(CurrentPlayerId);
+                Log.Message("Building Archipelago item Id to RimWorld defName map...");
                 LoadRimworldDefMaps();
+                Log.Message("Building Archipelago location map...");
                 await LoadLocationDictionary();
+                Log.Message("Creating research Defs for Archipelago locations...");
                 LoadResearchDefs();
+                Log.Message("Creating crafting recipes Defs for Archipelago locations...");
                 LoadCraftDefs();
+                Log.Message("!!! TO DO !!! Create merchant trades for Archipelago locations...");
+
+                Log.Message("Setting up Archipelago session events...");
                 AddSessionHooks();
 
+                Log.Message("Archipelago loader finished!");
                 isArchipelagoLoaded = true;
             }
             catch (Exception ex) { Log.Error(ex.Message + "\n" + ex.StackTrace); }
@@ -87,6 +99,7 @@ namespace RimworldArchipelago
         /// </summary>
         public void Unload()
         {
+            throw new NotImplementedException();
             // unload stuff added to rimworld
             // TODO this doesn't work anyway
             DefDatabase<ResearchProjectDef>.Clear();
@@ -98,29 +111,29 @@ namespace RimworldArchipelago
             PurchasLocations.Clear();
             Players.Clear();
             SlotData.Clear();
-            //RimWorldArchipelagoMod.ReceivedItems.Clear();
+            ArchipelagoWorldComp.Reset();
             isArchipelagoLoaded = false;
         }
 
         /// <summary>
-        /// Build the mappings from numerical archipelago ids to rimworld string def names. 
-        /// They have to be filled in from info received from Archipelago in SlotData.
+        /// Build the mappings from numerical Archipelago ids to rimworld string def names. 
+        /// This will help us when receiving items from Archipelago
         /// </summary>
         private void LoadRimworldDefMaps()
         {
-            var defNameMap = JsonConvert.DeserializeObject<Dictionary<long, string[]>>(SlotData["defNameMap"].ToString());
+            var defNameMap = JsonConvert.DeserializeObject<Dictionary<long, Dictionary<string, string>>>(SlotData["item_id_to_rimworld_def"].ToString());
             foreach (var kvp in defNameMap)
             {
                 Main.Instance.ArchipeligoItemIdToRimWorldDef[kvp.Key] = new Main.RimWorldDef()
                 {
-                    DefName = kvp.Value[0],
-                    DefType = kvp.Value[1]
+                    DefName = kvp.Value["defName"],
+                    DefType = kvp.Value["defType"]
                 };
             }
         }
 
         /// <summary>
-        /// Fill the locations dictionary, which maps the archipelago's numeric location ids to data we can use internally
+        /// Fill the locations dictionary, which maps the Archipelago's numeric location ids to data we can use internally
         /// </summary>
         private async Task LoadLocationDictionary()
         {
@@ -171,9 +184,37 @@ namespace RimworldArchipelago
                     catch (Exception ex) { Log.Error(ex.Message + "\n" + ex.StackTrace); }
                 });
 
-            Log.Message(" Researches: " + JsonConvert.SerializeObject(ResearchLocations));
-            Log.Message(" Crafts: " + JsonConvert.SerializeObject(CraftLocations));
-            Log.Message(" Purchases: " + JsonConvert.SerializeObject(PurchasLocations));
+            Log.Trace(" Research Locations: " + JsonConvert.SerializeObject(ResearchLocations));
+            Log.Trace(" Craft Locations: " + JsonConvert.SerializeObject(CraftLocations));
+            Log.Trace(" Purchase Locations: " + JsonConvert.SerializeObject(PurchasLocations));
+        }
+
+        /// <summary>
+        /// The research provided as Archipelago items should be obtained from Archipelago. Prevent normal research of them.
+        /// </summary>
+        private void DisableNormalResearch()
+        {
+            // use our def map, not all ResearchProjectDefs, in case there are researches that we will not get from Archipelago e.g. from mods
+            var researchDefNames = Main.Instance.ArchipeligoItemIdToRimWorldDef.Values.Where(def => def.DefType == "ResearchProjectDef").Select(def => def.DefName);
+            foreach (var researchName in researchDefNames)
+            {
+                var def = DefDatabase<ResearchProjectDef>.GetNamed(researchName);
+                if (def == null)
+                {
+                    Log.Error($"Could not find expected ResearchProjectDef by name {researchName}");
+                }
+                else
+                {
+                    // making it a prerequisite of itself should make it impossible to research directly
+                    // NEVERMIND IT MAKES RIMWORLD CTD 😂
+                    //def.prerequisites = def.prerequisites ?? new List<ResearchProjectDef>();
+                    //def.prerequisites?.Add(def);
+
+                    // yank it out of its normal research tab so it can't be selected or distract the player
+                    // note some alternate research ui mod may cause an issue?
+                    def.tab = null;
+                }
+            }
         }
 
         /// <summary>
@@ -182,12 +223,14 @@ namespace RimworldArchipelago
         /// </summary>
         private void LoadResearchDefs()
         {
+            DisableNormalResearch();
+
             // get archipelago research tab
             var tab = DefDatabase<ResearchTabDef>.GetNamed("AD_Archipelago");
             var researchesBefore = DefDatabase<ResearchProjectDef>.DefCount;
-            Log.Message($"number of researches before: {researchesBefore}");
+            Log.Trace($"number of researches before: {researchesBefore}");
             var techTree = JsonConvert.DeserializeObject<Dictionary<long, LocationResearchMetaData>>(SlotData["techTree"].ToString());
-            
+
             foreach (var kvp in techTree)
             {
                 var locationData = ResearchLocations[kvp.Key];
@@ -211,14 +254,14 @@ namespace RimworldArchipelago
 
             DefDatabase<ResearchProjectDef>.Add(AddedResearchDefs.Values);
             var researchesAfter = DefDatabase<ResearchProjectDef>.DefCount;
-            Log.Message($"number of researches after: {researchesAfter}");
+            Log.Trace($"number of researches after: {researchesAfter}");
             ResearchProjectDef.GenerateNonOverlappingCoordinates();
         }
 
         private void LoadCraftDefs()
         {
             //get new archipelago crafting table and other constant recipe properties
-            var recipeUsers = new List<ThingDef>(){ DefDatabase<ThingDef>.GetNamed("AD_ArchipelagoBench") };
+            var recipeUsers = new List<ThingDef>() { DefDatabase<ThingDef>.GetNamed("AD_ArchipelagoBench") };
             var workSkill = DefDatabase<SkillDef>.GetNamed("Crafting");
             var effectWorking = DefDatabase<EffecterDef>.GetNamed("Cook");
             var soundWorking = DefDatabase<SoundDef>.GetNamed("Recipe_Machining");
@@ -261,6 +304,7 @@ namespace RimworldArchipelago
             foreach (var kvp in CraftLocations)
             {
 
+                // TODO get ingredients from archipelago
                 var filter = Verse.Rand.Element(leathersFilter, textilesFilter, woolsFilter, stoneBlocksFilter, foodRawFilter);
                 var def = new RecipeDef()
                 {
@@ -270,7 +314,7 @@ namespace RimworldArchipelago
                     recipeUsers = recipeUsers,
                     workerClass = typeof(ArchipelagoRecipeWorker),
                     workSkill = workSkill,
-                    workAmount = 1000, //TODO configurable
+                    workAmount = 1000, //TODO get workAmount from archipelago
                     workSpeedStat = workSpeedStat,
                     allowMixingIngredients = true,
                     effectWorking = effectWorking,
@@ -281,7 +325,7 @@ namespace RimworldArchipelago
                     },
                     fixedIngredientFilter = filter,
                     defaultIngredientFilter = filter,
-                    //targetCountAdjustment=50
+                    targetCountAdjustment = 1
                 };
                 AddedRecipeDefs.Add(kvp.Key, def);
                 Main.Instance.DefNameToArchipelagoId[def.defName] = kvp.Key;
@@ -292,7 +336,6 @@ namespace RimworldArchipelago
 
         private void AddSessionHooks()
         {
-            // Must go AFTER a successful connection attempt
             Session.Items.ItemReceived += (receivedItemsHelper) =>
             {
                 var itemReceivedName = receivedItemsHelper.PeekItemName();
@@ -307,6 +350,7 @@ namespace RimworldArchipelago
                 {
                     //Find.LetterStack.ReceiveLetter(part.Text, part.Text, LetterDefOf.NeutralEvent);
                     Messages.Message(part.Text, MessageTypeDefOf.SilentInput, false);
+                    Log.Message(part.Text);
                 }
             };
         }

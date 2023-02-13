@@ -42,7 +42,7 @@ namespace RimworldArchipelago
 
         public readonly IDictionary<long, Location> ResearchLocations = new ConcurrentDictionary<long, Location>();
         public readonly IDictionary<long, Location> CraftLocations = new ConcurrentDictionary<long, Location>();
-        public readonly IDictionary<long, Location> PurchasLocations = new ConcurrentDictionary<long, Location>();
+        public readonly IDictionary<long, Location> PurchaseLocations = new ConcurrentDictionary<long, Location>();
         public int CurrentPlayerId;
         private IDictionary<string, object> SlotData { get; set; }
 
@@ -108,7 +108,7 @@ namespace RimworldArchipelago
             // Empty out our data mappings and stuff
             ResearchLocations.Clear();
             CraftLocations.Clear();
-            PurchasLocations.Clear();
+            PurchaseLocations.Clear();
             Players.Clear();
             SlotData.Clear();
             ArchipelagoWorldComp.Reset();
@@ -174,7 +174,7 @@ namespace RimworldArchipelago
                         }
                         else if (Main.IsPurchaseLocation(locationId))
                         {
-                            PurchasLocations[locationId] = location;
+                            PurchaseLocations[locationId] = location;
                         }
                         else
                         {
@@ -186,7 +186,7 @@ namespace RimworldArchipelago
 
             Log.Trace(" Research Locations: " + JsonConvert.SerializeObject(ResearchLocations));
             Log.Trace(" Craft Locations: " + JsonConvert.SerializeObject(CraftLocations));
-            Log.Trace(" Purchase Locations: " + JsonConvert.SerializeObject(PurchasLocations));
+            Log.Trace(" Purchase Locations: " + JsonConvert.SerializeObject(PurchaseLocations));
         }
 
         /// <summary>
@@ -266,6 +266,8 @@ namespace RimworldArchipelago
             var effectWorking = DefDatabase<EffecterDef>.GetNamed("Cook");
             var soundWorking = DefDatabase<SoundDef>.GetNamed("Recipe_Machining");
             var workSpeedStat = DefDatabase<StatDef>.GetNamed("GeneralLaborSpeed");
+            var workTableEfficiencyStat = DefDatabase<StatDef>.GetNamed("WorkTableEfficiencyFactor");
+            var workTableSpeedStat = DefDatabase<StatDef>.GetNamed("WorkTableWorkSpeedFactor");
 
             /*
              * Log.Message(string.Join(", " , DefDatabase<ThingCategoryDef>.AllDefsListForReading.Select(x => x.defName).ToArray()));
@@ -279,9 +281,19 @@ namespace RimworldArchipelago
              * CorpsesHumanlike, CorpsesAnimal, CorpsesInsect, CorpsesMechanoid
              */
 
-            Func<string, ThingFilter> makeFilter = (string s) => new ThingFilter()
+            Func<string, ThingFilter> makeFilter = (string s) =>
             {
-                DisplayRootCategory = DefDatabase<ThingCategoryDef>.GetNamed(s).treeNode
+                var category = DefDatabase<ThingCategoryDef>.GetNamed(s);
+                var output = new ThingFilter()
+                {
+                    //DisplayRootCategory = category.treeNode,
+                };
+                output.SetAllow(category, true);
+                output.ResolveReferences();
+                output.RecalculateDisplayRootCategory();
+                //output.customSummary = category.ToString();
+                //output.customSummary = $"{category.ToString()}: {output.Summary}";
+                return output;
             };
 
             var leathersFilter = makeFilter("Leathers");
@@ -318,6 +330,7 @@ namespace RimworldArchipelago
                     workSpeedStat = workSpeedStat,
                     allowMixingIngredients = true,
                     effectWorking = effectWorking,
+                    jobString = $"Making {kvp.Value.ExtendedLabel}.",
                     soundWorking = soundWorking,
                     ingredients = new List<IngredientCount>()
                     {
@@ -325,7 +338,9 @@ namespace RimworldArchipelago
                     },
                     fixedIngredientFilter = filter,
                     defaultIngredientFilter = filter,
-                    targetCountAdjustment = 1
+                    targetCountAdjustment = 1,
+                    workTableEfficiencyStat = workTableEfficiencyStat,
+                    workTableSpeedStat= workTableSpeedStat,
                 };
                 AddedRecipeDefs.Add(kvp.Key, def);
                 Main.Instance.DefNameToArchipelagoId[def.defName] = kvp.Key;

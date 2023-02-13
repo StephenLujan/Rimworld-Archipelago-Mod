@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <Defs>
-	<!-- Just some references here -->
-	<!-- 
+    <!-- Just some references here -->
+    <!-- 
   <ThingDef Name="BuildingBase" Abstract="True">
     <category>Building</category>
     <thingClass>Building</thingClass>
@@ -50,34 +50,32 @@
     <defName>AD_ArchipelagoBench</defName>
     <label>Archipelago Bench</label>
     <description>A workstation for archipelago.</description>
-	<thingClass>Building_WorkTable</thingClass>
-
+    <thingClass>Building_WorkTable</thingClass>
     <graphicData>
       <texPath>Building/archipelago_bench</texPath>
-	  <graphicClass>Graphic_Single</graphicClass>
+      <graphicClass>Graphic_Single</graphicClass>
       <drawSize>(1,1)</drawSize>
       <damageData>
-		<rect>(0, 0, 1, 1)</rect>
-	  </damageData>
+        <rect>(0, 0, 1, 1)</rect>
+      </damageData>
     </graphicData>
-	<!-- <altitudeLayer>FloorEmplacement</altitudeLayer> -->
-	<constructEffect>ConstructMetal</constructEffect>
-	<castEdgeShadows>true</castEdgeShadows>
+    <!-- <altitudeLayer>FloorEmplacement</altitudeLayer> -->
+    <constructEffect>ConstructMetal</constructEffect>
+    <castEdgeShadows>true</castEdgeShadows>
     <staticSunShadowHeight>0.10</staticSunShadowHeight>
-	<altitudeLayer>Building</altitudeLayer>
+    <altitudeLayer>Building</altitudeLayer>
     <fillPercent>0.8</fillPercent>
-	
+    
     <costList>
       <Steel>50</Steel>
       <ComponentIndustrial>1</ComponentIndustrial>
     </costList>
-
     <useHitPoints>True</useHitPoints>
     <statBases>
-		<MaxHitPoints>150</MaxHitPoints>
-		<WorkToBuild>500</WorkToBuild>
-		<Flammability>1.0</Flammability>
-		<Cleanliness>-2</Cleanliness>
+        <MaxHitPoints>150</MaxHitPoints>
+        <WorkToBuild>500</WorkToBuild>
+        <Flammability>1.0</Flammability>
+        <Cleanliness>-2</Cleanliness>
     </statBases>
     <size>(1,1)</size>
     <designationCategory>Production</designationCategory>
@@ -86,19 +84,22 @@
     <hasInteractionCell>True</hasInteractionCell>
     <interactionCellOffset>(0,0,-1)</interactionCellOffset>
     <surfaceType>Item</surfaceType>
+    <!--
+    recipes added at run-time from Archipelago
     <recipes>
-      <li>Make_Kibble</li> <!--just a test-->
+      <li>Make_Kibble</li>
     </recipes>
+    -->
     <inspectorTabs>
       <li>ITab_Bills</li>
     </inspectorTabs>
     <building>
-	  <paintable>false</paintable>
+      <paintable>false</paintable>
       <spawnedConceptLearnOpportunity>BillsTab</spawnedConceptLearnOpportunity>
-	  <forceShowRoomStats>true</forceShowRoomStats>
+      <forceShowRoomStats>true</forceShowRoomStats>
     </building>
-	<!-- TODO comps -->
-	<comps>
+    <!-- TODO comps -->
+    <comps>
       <li Class="CompProperties_AffectedByFacilities">
         <linkableFacilities>
           <li>ToolCabinet</li>
